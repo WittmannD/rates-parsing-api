@@ -1,0 +1,10 @@
+/node_modules
+/dist
+/gas
+
+.clasp.json
+.claspignore
+.dockerignore
+.env
+appsscript.json
+Dockerfile

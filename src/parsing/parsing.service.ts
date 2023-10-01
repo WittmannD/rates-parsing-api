@@ -1,12 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import Cast from '../common/cast';
 import { firstValueFrom } from 'rxjs';
 import * as _ from 'lodash';
-import { DhlExpressCookies } from '../common/cookies';
 import { stringify } from 'querystring';
 import * as cheerio from 'cheerio';
 import { getCSRFToken } from '../common/helpers';
+import { Country } from '../common/country';
+import { Vendor } from '../common/enums';
+import { HttpException } from '@nestjs/common/exceptions/http.exception';
 
 @Injectable()
 export class ParsingService {
@@ -33,7 +35,7 @@ export class ParsingService {
   constructor(private readonly httpService: HttpService) {}
 
   async parseWesternBid(
-    country: string,
+    country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
   ) {
@@ -95,7 +97,7 @@ export class ParsingService {
   }
 
   async parseSellerOnline(
-    country: string,
+    country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
   ) {
@@ -125,7 +127,7 @@ export class ParsingService {
   }
 
   async parseSkladUsa(
-    country: string,
+    country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
   ) {
@@ -170,7 +172,7 @@ export class ParsingService {
   }
 
   async parseDhlExpress(
-    country: string,
+    country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
   ) {
@@ -197,7 +199,7 @@ export class ParsingService {
   }
 
   async parseNovaGlobal(
-    country: string,
+    country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
   ) {
@@ -218,5 +220,36 @@ export class ParsingService {
     const [product, cost, terms] = response.data[0];
 
     return +cost;
+  }
+
+  async parse(
+    vendor: Vendor,
+    country: Country,
+    dimensions: { width: number; height: number; length: number },
+    weight: number,
+  ) {
+    try {
+      switch (vendor) {
+        case Vendor.NOVA_GLOBAL:
+          return await this.parseNovaGlobal(country, dimensions, weight);
+        case Vendor.DHL_EXPRESS:
+          return await this.parseDhlExpress(country, dimensions, weight);
+        case Vendor.WESTERN_BID:
+          return await this.parseWesternBid(country, dimensions, weight);
+        case Vendor.SELLER_ONLINE:
+          return await this.parseSellerOnline(country, dimensions, weight);
+        case Vendor.SKLAD_USA:
+          return await this.parseSkladUsa(country, dimensions, weight);
+        default:
+          throw new BadRequestException(`Unknown vendor "${vendor}"`);
+      }
+    } catch (e: any) {
+      if (e instanceof HttpException) throw e;
+
+      this.logger.error(
+        `${e?.name || 'Unknown Error'}: ${e?.message}`,
+        e?.stack || null,
+      );
+    }
   }
 }

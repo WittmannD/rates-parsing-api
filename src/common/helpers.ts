@@ -1,122 +1,73 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { Country } from './country';
 
 const addresses = {
   UA: {
+    localization: 'Україна',
     zipCode: '02000',
     city: 'kyiv',
   },
   US: {
+    localization: 'Сполучені Штати',
     zipCode: '20001',
     city: 'washington',
     state: 'DC',
   },
   CA: {
+    localization: 'Канада',
     zipCode: 'M1E 5K',
     city: 'toronto',
     state: 'ON',
   },
   AU: {
+    localization: 'Австралія',
     zipCode: '2000',
     city: 'sydney',
     state: 'NSW',
   },
   NZ: {
+    localization: 'Нова Зеландія',
     zipCode: '5016',
     city: 'wellington',
   },
   GB: {
+    localization: 'Велика Британія',
     zipCode: 'E1 0AA',
     city: 'london',
   },
   DE: {
+    localization: 'Німеччина',
     zipCode: '10026',
     city: 'berlin',
   },
   FR: {
+    localization: 'Франція',
     zipCode: '75001',
     city: 'paris',
   },
   IT: {
+    localization: 'Італія',
     zipCode: '00118',
     city: 'rome',
   },
   NL: {
+    localization: 'Нідерланди',
     zipCode: '1011',
     city: 'amsterdam',
   },
   ES: {
+    localization: 'Іспанія',
     zipCode: '28001',
     city: 'madrid',
   },
 };
 
-export function localizeCountry(country: string) {
-  switch (country.toLowerCase().trim()) {
-    case 'usa':
-    case 'united states of america':
-      return 'Сполучені Штати';
-    case 'canada':
-      return 'Канада';
-    case 'australia':
-      return 'Австралія';
-    case 'new zealand':
-      return 'Нова Зеландія';
-    case 'uk':
-    case 'united kingdom':
-    case 'great britain':
-    case 'england':
-      return 'Велика Британія';
-    case 'germany':
-      return 'Німеччина';
-    case 'france':
-      return 'Франція';
-    case 'italy':
-      return 'Італія';
-    case 'netherlands':
-      return 'Нідерланди';
-    case 'spain':
-      return 'Іспанія';
-    default:
-      return null;
-  }
+export function getLocalizedCountryName(country: Country) {
+  return addresses[country.code];
 }
 
-export function getCountryCode(country: string) {
-  switch (country.toLowerCase().trim()) {
-    case 'ukraine':
-      return 'UA';
-    case 'usa':
-    case 'united states of america':
-      return 'US';
-    case 'canada':
-      return 'CA';
-    case 'australia':
-      return 'AU';
-    case 'new zealand':
-      return 'NZ';
-    case 'uk':
-    case 'united kingdom':
-    case 'england':
-      return 'GB';
-    case 'germany':
-      return 'DE';
-    case 'france':
-      return 'FR';
-    case 'italy':
-      return 'IT';
-    case 'netherlands':
-      return 'NL';
-    case 'spain':
-      return 'ES';
-    default:
-      return null;
-  }
-}
-
-export function getDhlAddress(country: string) {
-  const code = getCountryCode(country);
-
+export function getDhlAddress(country: Country) {
   const data = {
     UA: {
       countryCode: 'UA',
@@ -219,12 +170,11 @@ export function getDhlAddress(country: string) {
     },
   };
 
-  return data[code];
+  return data[country.code];
 }
 
-export function getSkladUsaAddress(country: string) {
-  const countryCode = getCountryCode(country);
-  const address = addresses[countryCode];
+export function getSkladUsaAddress(country: Country) {
+  const address = addresses[country.code];
 
   const options = {
     US: '223',
@@ -240,19 +190,18 @@ export function getSkladUsaAddress(country: string) {
   };
 
   return {
-    'form[region]': options[countryCode],
+    'form[region]': options[country.code],
     'form[state]': 3628, // DC
     'form[city]': address.city,
     'form[zip]': address.zipCode,
   };
 }
 
-export function getSellerOnlineAddress(country: string) {
-  const countryCode = getCountryCode(country);
-  const address = addresses[countryCode];
+export function getSellerOnlineAddress(country: Country) {
+  const address = addresses[country.code];
 
   const data = {
-    country: countryCode,
+    country: country.code,
     zip: address.zipCode,
   };
 
@@ -263,12 +212,11 @@ export function getSellerOnlineAddress(country: string) {
   return data;
 }
 
-export function getWesternBidAddress(country: string) {
-  const countryCode = getCountryCode(country);
-  const address = addresses[countryCode];
+export function getWesternBidAddress(country: Country) {
+  const address = addresses[country.code];
 
   return {
-    ToCountryCode: countryCode,
+    ToCountryCode: country.code,
     ToZipCode: address.zipCode,
   };
 }

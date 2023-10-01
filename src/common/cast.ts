@@ -1,23 +1,12 @@
-// USA
-// Canada
-// Australia
-// New Zealand
-// UK
-// Germany
-// France
-// Italy
-// Netherlands
-// Spain
-
 import { format } from 'date-fns';
 import {
-  getCountryCode,
   getDhlAddress,
   getSellerOnlineAddress,
   getSkladUsaAddress,
   getWesternBidAddress,
-  localizeCountry,
+  getLocalizedCountryName,
 } from './helpers';
+import { Country } from './country';
 
 export interface ParcelDimensions {
   width: number;
@@ -26,10 +15,10 @@ export interface ParcelDimensions {
 }
 
 const Cast = {
-  novaGlobal(country: string, dimensions: ParcelDimensions, weight: number) {
+  novaGlobal(country: Country, dimensions: ParcelDimensions, weight: number) {
     return {
       pickup_country: 'Україна',
-      destination_country: localizeCountry(country),
+      destination_country: getLocalizedCountryName(country),
       ...dimensions,
       weight: weight / 1000, // grams to kg
       type: 'Вантаж',
@@ -39,11 +28,11 @@ const Cast = {
     };
   },
 
-  dhlExpress(country: string, dimensions: ParcelDimensions, weight: number) {
+  dhlExpress(country: Country, dimensions: ParcelDimensions, weight: number) {
     const { width, height, length } = dimensions;
 
     return {
-      fromAddress: getDhlAddress('ukraine'),
+      fromAddress: getDhlAddress(Country.get('Ukraine')),
       toAddress: getDhlAddress(country),
       globalMailShipment: false,
       dutiable: true,
@@ -78,7 +67,7 @@ const Cast = {
     };
   },
 
-  skladUsa(country: string, dimensions: ParcelDimensions, weight: number) {
+  skladUsa(country: Country, dimensions: ParcelDimensions, weight: number) {
     return {
       'form[from_country]': 1,
       ...getSkladUsaAddress(country),
@@ -91,7 +80,7 @@ const Cast = {
     };
   },
 
-  sellerOnline(country: string, dimensions: ParcelDimensions, weight: number) {
+  sellerOnline(country: Country, dimensions: ParcelDimensions, weight: number) {
     return {
       weight: weight / 1000, // gram to kg
       ...getSellerOnlineAddress(country),
@@ -103,11 +92,11 @@ const Cast = {
     };
   },
 
-  westernBid(country: string, dimensions: ParcelDimensions, weight: number) {
+  westernBid(country: Country, dimensions: ParcelDimensions, weight: number) {
     return {
       lang: 'uk',
       version: 'v2',
-      FromCountryCode: getCountryCode('ukraine'),
+      FromCountryCode: Country.get('Ukraine').code,
       ...getWesternBidAddress(country),
       NullLength: dimensions.length,
       NullWidth: dimensions.width,
