@@ -5,10 +5,11 @@ import { firstValueFrom } from 'rxjs';
 import * as _ from 'lodash';
 import { stringify } from 'querystring';
 import * as cheerio from 'cheerio';
-import { getCSRFToken } from '../common/helpers';
+import { getCSRFToken, prettifyAxiosError } from '../common/helpers';
 import { Country } from '../common/country';
 import { Vendor } from '../common/enums';
 import { HttpException } from '@nestjs/common/exceptions/http.exception';
+import { AxiosError } from 'axios';
 
 @Injectable()
 export class ParsingService {
@@ -38,12 +39,14 @@ export class ParsingService {
     country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
+    requestData?: Record<string, any>,
   ) {
     const csrfToken = await getCSRFToken(
       this.settings.westernBid.form,
       'form > [name=__RequestVerificationToken]',
     );
-    const inputData = Cast.westernBid(country, dimensions, weight);
+    let inputData = Cast.westernBid(country, dimensions, weight);
+    inputData = _.merge(inputData, requestData);
     const observable = this.httpService.request({
       method: 'get',
       url: this.settings.westernBid.url,
@@ -61,7 +64,7 @@ export class ParsingService {
       if (costParagraph && costRegex.test(costParagraph.text())) {
         const productParagraph = $(div).find('.calc-text-wrapper > p').first();
 
-        rates[productParagraph.text().trim()] = costRegex.exec(
+        rates[productParagraph.text().trim()] = +costRegex.exec(
           costParagraph.text(),
         )[1];
       }
@@ -88,7 +91,7 @@ export class ParsingService {
               .text()
               .trim()} - ${productParagraph.text().trim()}`;
 
-            rates[product] = costRegex.exec(costParagraph.text())[1];
+            rates[product] = +costRegex.exec(costParagraph.text())[1];
           }
         });
     });
@@ -100,8 +103,10 @@ export class ParsingService {
     country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
+    requestData?: Record<string, any>,
   ) {
-    const inputData = Cast.sellerOnline(country, dimensions, weight);
+    let inputData = Cast.sellerOnline(country, dimensions, weight);
+    inputData = _.merge(inputData, requestData);
 
     const observable = this.httpService.request({
       method: 'post',
@@ -130,8 +135,10 @@ export class ParsingService {
     country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
+    requestData?: Record<string, any>,
   ) {
-    const inputData = Cast.skladUsa(country, dimensions, weight);
+    let inputData = Cast.skladUsa(country, dimensions, weight);
+    inputData = _.merge(inputData, requestData);
 
     const observable = this.httpService.request({
       method: 'post',
@@ -158,13 +165,15 @@ export class ParsingService {
             .trim()
             .replace(/\s\s/g, '')
             .replace('\n', '');
-          rates[product] = td
+          const cost = td
             .last()
             .text()
-            .trim()
             .replace(/\s\s/g, '')
             .replace('\n', '')
-            .replace('$', '');
+            .replace('$', '')
+            .trim();
+
+          if (/\d+/.test(cost)) rates[product] = +cost;
         });
     });
 
@@ -175,8 +184,10 @@ export class ParsingService {
     country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
+    requestData?: Record<string, any>,
   ) {
-    const inputData = Cast.dhlExpress(country, dimensions, weight);
+    let inputData = Cast.dhlExpress(country, dimensions, weight);
+    inputData = _.merge(inputData, requestData);
 
     const observable = this.httpService.request({
       method: 'post',
@@ -184,6 +195,7 @@ export class ParsingService {
       data: inputData,
       headers: {
         'Content-Type': 'application/json',
+        Referer: 'https://mydhl.express.dhl/ua/uk/shipment.html',
       },
     });
 
@@ -202,8 +214,10 @@ export class ParsingService {
     country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
+    requestData?: Record<string, any>,
   ) {
-    const inputData = Cast.novaGlobal(country, dimensions, weight);
+    let inputData = Cast.novaGlobal(country, dimensions, weight);
+    inputData = _.merge(inputData, requestData);
 
     const observable = this.httpService.request({
       method: 'post',
@@ -227,29 +241,59 @@ export class ParsingService {
     country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
+    requestData?: Record<string, any>,
   ) {
     try {
       switch (vendor) {
         case Vendor.NOVA_GLOBAL:
-          return await this.parseNovaGlobal(country, dimensions, weight);
+          return await this.parseNovaGlobal(
+            country,
+            dimensions,
+            weight,
+            requestData,
+          );
         case Vendor.DHL_EXPRESS:
-          return await this.parseDhlExpress(country, dimensions, weight);
+          return await this.parseDhlExpress(
+            country,
+            dimensions,
+            weight,
+            requestData,
+          );
         case Vendor.WESTERN_BID:
-          return await this.parseWesternBid(country, dimensions, weight);
+          return await this.parseWesternBid(
+            country,
+            dimensions,
+            weight,
+            requestData,
+          );
         case Vendor.SELLER_ONLINE:
-          return await this.parseSellerOnline(country, dimensions, weight);
+          return await this.parseSellerOnline(
+            country,
+            dimensions,
+            weight,
+            requestData,
+          );
         case Vendor.SKLAD_USA:
-          return await this.parseSkladUsa(country, dimensions, weight);
+          return await this.parseSkladUsa(
+            country,
+            dimensions,
+            weight,
+            requestData,
+          );
         default:
           throw new BadRequestException(`Unknown vendor "${vendor}"`);
       }
     } catch (e: any) {
       if (e instanceof HttpException) throw e;
 
-      this.logger.error(
-        `${e?.name || 'Unknown Error'}: ${e?.message}`,
-        e?.stack || null,
-      );
+      if (e instanceof AxiosError) {
+        this.logger.error(prettifyAxiosError(e));
+      } else {
+        this.logger.error(
+          `${e?.name || 'Unknown Error'}: ${e?.message}`,
+          e?.stack || null,
+        );
+      }
     }
   }
 }

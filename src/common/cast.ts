@@ -18,7 +18,10 @@ const Cast = {
   novaGlobal(country: Country, dimensions: ParcelDimensions, weight: number) {
     return {
       pickup_country: 'Україна',
-      destination_country: getLocalizedCountryName(country),
+      destination_country:
+        country.code.toUpperCase() === 'GB'
+          ? 'Гернсі'
+          : getLocalizedCountryName(country),
       ...dimensions,
       weight: weight / 1000, // grams to kg
       type: 'Вантаж',

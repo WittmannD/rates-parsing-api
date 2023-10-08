@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+
 import * as cheerio from 'cheerio';
 import { Country } from './country';
 
@@ -16,7 +17,7 @@ const addresses = {
   },
   CA: {
     localization: 'Канада',
-    zipCode: 'M1E 5K',
+    zipCode: 'M5A 2W1',
     city: 'toronto',
     state: 'ON',
   },
@@ -63,8 +64,28 @@ const addresses = {
   },
 };
 
+export function prettifyAxiosError(err: any) {
+  if (!(err instanceof AxiosError) || !err.response) return err;
+
+  const content =
+    typeof err.response.data === 'string'
+      ? err.response.data.slice(0, 1000)
+      : err.response.data;
+
+  const headers = Object(err.response.headers);
+  const config = err.response.config;
+
+  return {
+    message: err.message,
+    statusText: err.response.statusText,
+    config,
+    headers,
+    content,
+  };
+}
+
 export function getLocalizedCountryName(country: Country) {
-  return addresses[country.code];
+  return addresses[country.code].localization;
 }
 
 export function getDhlAddress(country: Country) {
@@ -125,7 +146,7 @@ export function getDhlAddress(country: Country) {
     },
     DE: {
       countryCode: 'DE',
-      postCode: '10026',
+      postCode: '10117',
       cityName: 'BERLIN',
       addressLine1: '',
       serviceAreaCode: 'BER',
@@ -224,9 +245,22 @@ export function getWesternBidAddress(country: Country) {
 export async function getCSRFToken(url: string, selector: string) {
   const response = await axios.request({
     method: 'get',
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36',
+    },
     url,
   });
 
   const $ = cheerio.load(response.data);
   return $(selector).first().val();
+}
+
+export function decodeBase64JSON(str: string) {
+  try {
+    const decoded = Buffer.from(str, 'base64').toString('utf-8');
+    return JSON.parse(decoded);
+  } catch (e: any) {
+    return null;
+  }
 }

@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpModule } from '@nestjs/axios';
 import { ParsingService } from './parsing.service';
+import { Country } from '../common/country';
+import { Vendor } from '../common/enums';
 
 describe('ParsingService', () => {
   let service: ParsingService;
@@ -23,21 +25,48 @@ describe('ParsingService', () => {
   });
 
   it('should be', async () => {
-    const value = await service.parseNovaGlobal(
-      'usa',
-      { width: 10, height: 10, length: 12 },
-      1000,
-    );
-    expect(value).toEqual(900);
-  });
+    const vendors = [
+      Vendor.NOVA_GLOBAL,
+      Vendor.DHL_EXPRESS,
+      Vendor.SELLER_ONLINE,
+      Vendor.SKLAD_USA,
+      Vendor.WESTERN_BID,
+    ];
+    const countries = [
+      'US',
+      'CA',
+      'AU',
+      'NZ',
+      'GB',
+      'DE',
+      'FR',
+      'IT',
+      'NL',
+      'ES',
+    ];
 
-  it('should work', async () => {
-    const value = await service.parseWesternBid(
-      'usa',
-      { width: 10, height: 10, length: 12 },
-      1000,
-    );
-    console.log(value);
-    expect(value).toBeDefined();
-  }, 50000);
+    for (const country of countries) {
+      for (const vendor of vendors) {
+        const value = await service.parse(
+          vendor,
+          Country.get(country),
+          {
+            width: 10,
+            height: 10,
+            length: 10,
+          },
+          200,
+        );
+
+        if (typeof value !== 'number') {
+          expect(value).toBeDefined();
+          const values = Object.values(value);
+
+          for (const val of values) {
+            expect(typeof val).toBe('number');
+          }
+        }
+      }
+    }
+  }, 100_000_000);
 });
