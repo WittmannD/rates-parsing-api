@@ -29,4 +29,8 @@ export class Country {
   get capital(): string {
     return countries.capital(this._code);
   }
+
+  toString() {
+    return this._code;
+  }
 }

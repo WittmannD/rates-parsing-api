@@ -11,13 +11,18 @@ function getAgentRate(
   length: number,
   weight: number,
   searchPattern?: string,
+  requestData?: string,
 ) {
-  const rates = Api.request('get', `${vendor}/${country}`, {
+  const data = {
     width,
     height,
     length,
     weight,
-  });
+  };
+
+  if (requestData) data['requestData'] = requestData;
+
+  const rates = Api.request('get', `${vendor}/${country}`, data);
 
   const entries = Object.entries(rates);
 
@@ -78,6 +83,15 @@ export function parse(
       });
     case 'westernbid':
     case 'selleronline':
+      return getAgentRate(
+        vendor,
+        country,
+        width,
+        height,
+        length,
+        weight,
+        searchPattern,
+      );
     case 'skladusa':
       return getAgentRate(
         vendor,
@@ -87,6 +101,7 @@ export function parse(
         length,
         weight,
         searchPattern,
+        'eyJmb3JtW2NsaWVudFBQXVtdIjoiWWVzIn0=',
       );
     default:
       throw `Unknown vendor "${vendor}"`;
@@ -98,28 +113,68 @@ export function batchParse(
   country: string,
   parameters: [number, number, number, number][],
   searchPatterns?: string[],
-): number[][] {
-  searchPatterns = searchPatterns || ['\\w+'];
-  const result = [];
-  for (const [width, height, length, weight] of parameters) {
-    const row = [];
+): (number | null)[][] {
+  searchPatterns = Array.isArray(searchPatterns?.[0])
+    ? searchPatterns[0]
+    : typeof searchPatterns === 'string'
+    ? [searchPatterns]
+    : searchPatterns;
+  vendor = vendor.toLowerCase().trim();
 
-    for (const searchPattern of searchPatterns) {
-      const rate = parse(
-        vendor,
-        country,
-        width,
-        height,
-        length,
-        weight,
-        searchPattern,
-      );
-      row.push(rate);
+  const data = {
+    parameters: Helpers.compressQueryParameter(parameters),
+  };
+
+  if (vendor === 'skladusa')
+    data['requestData'] = 'eyJmb3JtW2NsaWVudFBQXVtdIjoiWWVzIn0=';
+
+  const result = Api.request('get', `batch/${vendor}/${country}`, data);
+
+  if (
+    vendor === 'skladusa' ||
+    vendor === 'westernbid' ||
+    vendor === 'selleronline'
+  ) {
+    if (!searchPatterns) {
+      const columns = new Set();
+
+      for (const rates of result) {
+        if (rates === null) continue;
+
+        for (const key of Object.keys(rates)) {
+          columns.add(key);
+        }
+      }
+
+      return result.map((rates: any) => {
+        if (rates === null) return Array(columns.size).fill(null);
+
+        return Array.from(columns).map((column) => {
+          return (
+            Object.entries(rates).find(
+              ([product]) => column === product.trim(),
+            )?.[1] || null
+          );
+        });
+      });
     }
 
-    result.push(row);
+    return result.map((rates: any) => {
+      if (rates === null) return Array(searchPatterns.length).fill(null);
+
+      return searchPatterns.map((column) => {
+        return (
+          Object.entries(rates).find(([product]) =>
+            new RegExp(column).test(product.trim()),
+          )?.[1] || null
+        );
+      });
+    });
   }
-  return result;
+
+  console.log(result);
+
+  return result.map((rate: number | null) => [rate]);
 }
 
 export function parseByReference(

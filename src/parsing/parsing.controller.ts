@@ -1,19 +1,10 @@
-import {
-  Controller,
-  Get,
-  Logger,
-  Param,
-  Query,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Controller, Get, Logger, Param, Query } from '@nestjs/common';
 import { ParsingService } from './parsing.service';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { ParsingParams } from './dto/parsing-params';
 import { ParsingQueryDTO } from './dto/parsing-query.dto';
-import { decodeBase64JSON } from '../common/helpers';
+import { BatchParsingQueryDTO } from './dto/batch-parsing-query.dto';
 
 @Controller('parsing')
-@UseInterceptors(CacheInterceptor)
 export class ParsingController {
   private readonly logger = new Logger(ParsingController.name);
   constructor(private readonly parsingService: ParsingService) {}
@@ -21,9 +12,7 @@ export class ParsingController {
   @Get(':vendor/:country')
   async parse(@Param() params: ParsingParams, @Query() query: ParsingQueryDTO) {
     const { vendor, country } = params;
-    const { width, height, length, weight, requestData } = query;
-
-    this.logger.log(`Getting rates of ${vendor} for country ${country.name}`);
+    const { width, height, length, weight, requestData, seed } = query;
 
     return this.parsingService.parse(
       vendor,
@@ -31,6 +20,24 @@ export class ParsingController {
       { width, height, length },
       weight,
       requestData,
+      seed,
+    );
+  }
+
+  @Get('batch/:vendor/:country')
+  async batchParse(
+    @Param() params: ParsingParams,
+    @Query() query: BatchParsingQueryDTO,
+  ) {
+    const { vendor, country } = params;
+    const { parameters, requestData, seed } = query;
+
+    return this.parsingService.batchParse(
+      vendor,
+      country,
+      parameters,
+      requestData,
+      seed,
     );
   }
 }

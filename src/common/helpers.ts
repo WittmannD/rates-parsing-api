@@ -1,7 +1,9 @@
+import { unzipSync } from 'node:zlib';
 import axios, { AxiosError } from 'axios';
 
 import * as cheerio from 'cheerio';
 import { Country } from './country';
+import { createHash } from 'node:crypto';
 
 const addresses = {
   UA: {
@@ -263,4 +265,25 @@ export function decodeBase64JSON(str: string) {
   } catch (e: any) {
     return null;
   }
+}
+
+export function decodeGzipJSON(str: string) {
+  try {
+    const compressed = Buffer.from(str, 'base64url');
+    const decompressed = unzipSync(compressed);
+    return JSON.parse(decompressed.toString('utf8'));
+  } catch (e: any) {
+    return null;
+  }
+}
+export function getObjectSig(obj: any) {
+  const orderedObj = Object.fromEntries(Object.entries(obj).sort());
+  const jsonObj = JSON.stringify(orderedObj);
+  return createHash('md5').update(jsonObj).digest('hex');
+}
+
+export function getArgumentsSig(args: IArguments) {
+  return createHash('md5')
+    .update(JSON.stringify(Array.from(args)))
+    .digest('hex');
 }

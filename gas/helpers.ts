@@ -71,6 +71,13 @@ const Helpers = {
     );
   },
 
+  compressQueryParameter(obj: Record<any, any>) {
+    const jsonString = JSON.stringify(obj);
+    const textBlob = Utilities.newBlob(jsonString);
+    const gzipBlob = Utilities.gzip(textBlob);
+    return Utilities.base64Encode(gzipBlob.getBytes());
+  },
+
   getObjectSig(obj: Record<any, any>) {
     const orderedObj = Object.fromEntries(Object.entries(obj).sort());
     return this.md5(JSON.stringify(orderedObj));

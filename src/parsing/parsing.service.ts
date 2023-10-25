@@ -5,11 +5,13 @@ import { firstValueFrom } from 'rxjs';
 import * as _ from 'lodash';
 import { stringify } from 'querystring';
 import * as cheerio from 'cheerio';
-import { getCSRFToken, prettifyAxiosError } from '../common/helpers';
+import { getCSRFToken } from '../common/helpers';
 import { Country } from '../common/country';
 import { Vendor } from '../common/enums';
-import { HttpException } from '@nestjs/common/exceptions/http.exception';
-import { AxiosError } from 'axios';
+import { CachingService } from '../caching/caching.service';
+import { TTLCache } from '../caching/caching.decorator';
+import * as Limit from 'p-limit';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ParsingService {
@@ -33,7 +35,11 @@ export class ParsingService {
     },
   };
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly cachingService: CachingService,
+    private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
+  ) {}
 
   async parseWesternBid(
     country: Country,
@@ -236,64 +242,106 @@ export class ParsingService {
     return +cost;
   }
 
+  @TTLCache()
   async parse(
     vendor: Vendor,
     country: Country,
     dimensions: { width: number; height: number; length: number },
     weight: number,
     requestData?: Record<string, any>,
+    seed?: string,
   ) {
-    try {
-      switch (vendor) {
-        case Vendor.NOVA_GLOBAL:
-          return await this.parseNovaGlobal(
-            country,
-            dimensions,
-            weight,
-            requestData,
-          );
-        case Vendor.DHL_EXPRESS:
-          return await this.parseDhlExpress(
-            country,
-            dimensions,
-            weight,
-            requestData,
-          );
-        case Vendor.WESTERN_BID:
-          return await this.parseWesternBid(
-            country,
-            dimensions,
-            weight,
-            requestData,
-          );
-        case Vendor.SELLER_ONLINE:
-          return await this.parseSellerOnline(
-            country,
-            dimensions,
-            weight,
-            requestData,
-          );
-        case Vendor.SKLAD_USA:
-          return await this.parseSkladUsa(
-            country,
-            dimensions,
-            weight,
-            requestData,
-          );
-        default:
-          throw new BadRequestException(`Unknown vendor "${vendor}"`);
-      }
-    } catch (e: any) {
-      if (e instanceof HttpException) throw e;
+    this.logger.log(
+      `Getting rates of ${vendor} for ${country} with seed ${seed}`,
+    );
 
-      if (e instanceof AxiosError) {
-        this.logger.error(prettifyAxiosError(e));
-      } else {
-        this.logger.error(
-          `${e?.name || 'Unknown Error'}: ${e?.message}`,
-          e?.stack || null,
+    switch (vendor) {
+      case Vendor.NOVA_GLOBAL:
+        return await this.parseNovaGlobal(
+          country,
+          dimensions,
+          weight,
+          requestData,
         );
-      }
+      case Vendor.DHL_EXPRESS:
+        return await this.parseDhlExpress(
+          country,
+          dimensions,
+          weight,
+          requestData,
+        );
+      case Vendor.WESTERN_BID:
+        return await this.parseWesternBid(
+          country,
+          dimensions,
+          weight,
+          requestData,
+        );
+      case Vendor.SELLER_ONLINE:
+        return await this.parseSellerOnline(
+          country,
+          dimensions,
+          weight,
+          requestData,
+        );
+      case Vendor.SKLAD_USA:
+        return await this.parseSkladUsa(
+          country,
+          dimensions,
+          weight,
+          requestData,
+        );
+      default:
+        throw new BadRequestException(`Unknown vendor "${vendor}"`);
     }
+  }
+
+  async batchParse(
+    vendor: Vendor,
+    country: Country,
+    parameters: [number, number, number, number][],
+    requestData?: Record<string, any>,
+    seed?: string,
+  ) {
+    this.logger.log(
+      `Running of batch rates parsing of "${vendor}" for ${country} with seed ${seed}`,
+    );
+
+    const limit = Limit(
+      this.configService.get<number>('main.workersLimit', 10),
+    );
+
+    const tasks = [];
+    let i = 0;
+
+    for (const [width, height, length, weight] of parameters) {
+      tasks.push(
+        limit(async () => ({
+          index: i++,
+          data: await this.parse(
+            vendor,
+            country,
+            { width, height, length },
+            weight,
+            requestData,
+            seed,
+          ),
+        })),
+      );
+    }
+
+    const results = await Promise.allSettled(tasks);
+    const rates = Array(parameters.length).fill(null);
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(`Error in tasks of batch parsing: ${result.reason}`);
+        continue;
+      }
+
+      rates[result.value.index] = result.value.data;
+    }
+
+    return rates;
   }
 }

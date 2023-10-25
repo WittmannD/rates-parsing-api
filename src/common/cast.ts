@@ -78,7 +78,7 @@ const Cast = {
       'form[height]': dimensions.height,
       'form[width]': dimensions.width,
       'form[lenght]': dimensions.length,
-      'form[clientPP][]': 'No',
+      'form[clientPP][]': 'Yes',
       'form[save]': '',
     };
   },

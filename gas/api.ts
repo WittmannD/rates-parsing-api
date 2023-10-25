@@ -8,6 +8,7 @@ const Api = {
     'http://ec2-18-135-13-146.eu-west-2.compute.amazonaws.com:3000/api/parsing/',
   request(method: 'post' | 'get', path: string, data: Record<string, any>) {
     data = { ...data, seed: this.seed };
+
     const objectSig = Helpers.getObjectSig({ path, data });
     const cachedValue = Caching.get(objectSig);
 
