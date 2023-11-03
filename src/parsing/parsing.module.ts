@@ -4,6 +4,7 @@ import { ParsingController } from './parsing.controller';
 import { HttpModule } from '@nestjs/axios';
 import { IsAcceptableCountry } from '../common/validatots/is-acceptable-country.validator';
 import { CachingModule } from '../caching/caching.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CachingModule } from '../caching/caching.module';
       },
     }),
     CachingModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [ParsingController],
   providers: [ParsingService, IsAcceptableCountry],

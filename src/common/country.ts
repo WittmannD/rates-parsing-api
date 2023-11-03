@@ -33,4 +33,8 @@ export class Country {
   toString() {
     return this._code;
   }
+
+  toJSON() {
+    return this._code;
+  }
 }

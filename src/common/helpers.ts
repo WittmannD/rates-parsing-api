@@ -283,7 +283,5 @@ export function getObjectSig(obj: any) {
 }
 
 export function getArgumentsSig(args: IArguments) {
-  return createHash('md5')
-    .update(JSON.stringify(Array.from(args)))
-    .digest('hex');
+  return JSON.stringify(Array.from(args))
 }

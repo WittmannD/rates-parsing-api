@@ -12,6 +12,7 @@ import { CachingService } from '../caching/caching.service';
 import { TTLCache } from '../caching/caching.decorator';
 import * as Limit from 'p-limit';
 import { ConfigService } from '@nestjs/config';
+import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 
 @Injectable()
 export class ParsingService {
@@ -39,6 +40,7 @@ export class ParsingService {
     private readonly cachingService: CachingService,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
+    private readonly schedulerRegistry: SchedulerRegistry,
   ) {}
 
   async parseWesternBid(
@@ -244,13 +246,14 @@ export class ParsingService {
 
   @TTLCache()
   async parse(
-    vendor: Vendor,
-    country: Country,
+    vendor: Vendor | string,
+    country: Country | string,
     dimensions: { width: number; height: number; length: number },
     weight: number,
     requestData?: Record<string, any>,
     seed?: string,
   ) {
+    country = typeof country === 'string' ? Country.get(country) : country;
     this.logger.log(
       `Getting rates of ${vendor} for ${country} with seed ${seed}`,
     );
@@ -339,9 +342,46 @@ export class ParsingService {
         continue;
       }
 
-      rates[result.value.index] = result.value.data;
+      rates[result.value.index] = result.value.data || null;
     }
 
     return rates;
+  }
+
+  @Cron('0 12 * * 0')
+  async updateCache() {
+    const records = await this.cachingService.getExpired();
+    const now = Date.now();
+
+    const chunkSize = this.configService.get<number>('main.chunkSize', 160);
+
+    this.logger.log(
+      `Found ${records.length} cache records that need to be updated. Running the update strategy with the chunk size ${chunkSize}...`,
+    );
+
+    for (let i = 0; i < records.length / chunkSize; i++) {
+      const offset = i * chunkSize;
+      const chunk = records.slice(offset, i + chunkSize);
+      const timeout = setTimeout(
+        () => {
+          const limit = Limit(
+            this.configService.get<number>('main.workersLimit', 10),
+          );
+
+          const tasks = chunk.map(({ key }) => {
+            const parameters = JSON.parse(key);
+            return limit(() =>
+              this.parse(
+                ...(parameters as Parameters<typeof this.parse>),
+              ).catch((err) => this.logger.error(`${err}`)),
+            );
+          });
+
+          Promise.allSettled(tasks);
+        },
+        (i + 1) * 10_000,
+      );
+      this.schedulerRegistry.addTimeout(`${now}_${i}`, timeout);
+    }
   }
 }

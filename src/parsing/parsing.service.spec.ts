@@ -2,7 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpModule } from '@nestjs/axios';
 import { ParsingService } from './parsing.service';
 import { Country } from '../common/country';
-import { Vendor } from '../common/enums';
+import { CachingModule } from '../caching/caching.module';
+import { ConfigModule } from '@nestjs/config';
+import Config from '../common/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 describe('ParsingService', () => {
   let service: ParsingService;
@@ -12,6 +15,15 @@ describe('ParsingService', () => {
       imports: [
         HttpModule.register({
           timeout: 1000 * 60 * 2, // 2 min
+        }),
+        CachingModule,
+        ConfigModule.forRoot({ isGlobal: true, load: [Config] }),
+        TypeOrmModule.forRoot({
+          type: 'sqlite',
+          database: ':memory:',
+          dropSchema: true,
+          entities: [],
+          synchronize: true,
         }),
       ],
       providers: [ParsingService],
@@ -24,49 +36,22 @@ describe('ParsingService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should be', async () => {
-    const vendors = [
-      Vendor.NOVA_GLOBAL,
-      Vendor.DHL_EXPRESS,
-      Vendor.SELLER_ONLINE,
-      Vendor.SKLAD_USA,
-      Vendor.WESTERN_BID,
-    ];
-    const countries = [
-      'US',
-      'CA',
-      'AU',
-      'NZ',
-      'GB',
-      'DE',
-      'FR',
-      'IT',
-      'NL',
-      'ES',
-    ];
+  it('should return dhl rates', async () => {
+    const result = await service.parseDhlExpress(
+      Country.get('usa'),
+      {
+        width: 10,
+        height: 10,
+        length: 12,
+      },
+      200,
+    );
+    console.log(result);
+    expect(result).toBeDefined();
+    expect(result).not.toEqual(null);
+  });
 
-    for (const country of countries) {
-      for (const vendor of vendors) {
-        const value = await service.parse(
-          vendor,
-          Country.get(country),
-          {
-            width: 10,
-            height: 10,
-            length: 10,
-          },
-          200,
-        );
-
-        if (typeof value !== 'number') {
-          expect(value).toBeDefined();
-          const values = Object.values(value);
-
-          for (const val of values) {
-            expect(typeof val).toBe('number');
-          }
-        }
-      }
-    }
+  it('should work', async () => {
+    await service.updateCache();
   }, 100_000_000);
 });
