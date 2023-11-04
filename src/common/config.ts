@@ -8,4 +8,5 @@ export default registerAs('main', () => ({
   cacheMaxItems: +process.env.CACHE_MAX_ITEMS || 40_000,
   cacheTTL: +process.env.CACHE_TTL || 1000 * 60 * 60 * 24 * 2, // = 2 days,
   workersLimit: +process.env.WORKERS_LIMIT || 10,
+  chunkSize: +process.env.CHUNK_SIZE || 200,
 }));

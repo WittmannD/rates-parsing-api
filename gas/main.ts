@@ -125,9 +125,6 @@ export function batchParse(
     parameters: Helpers.compressQueryParameter(parameters),
   };
 
-  if (vendor === 'skladusa')
-    data['requestData'] = 'eyJmb3JtW2NsaWVudFBQXVtdIjoiWWVzIn0=';
-
   const result = Api.request('get', `batch/${vendor}/${country}`, data);
 
   if (

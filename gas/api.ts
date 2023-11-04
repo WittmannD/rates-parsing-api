@@ -2,14 +2,17 @@ import Helpers from './helpers';
 import Caching from './caching';
 import { Logger } from '@nestjs/common';
 
+const properties = PropertiesService.getScriptProperties();
+
 const Api = {
-  seed: 'RYmh4iDdmY',
-  baseUrl:
-    'http://ec2-18-135-13-146.eu-west-2.compute.amazonaws.com:3000/api/parsing/',
+  baseUrl: properties.getProperty('API_URL'),
+  seed: properties.getProperty('SEED'),
   request(method: 'post' | 'get', path: string, data: Record<string, any>) {
+    const cacheKey = properties.getProperty('CACHE_KEY');
+
     data = { ...data, seed: this.seed };
 
-    const objectSig = Helpers.getObjectSig({ path, data });
+    const objectSig = Helpers.getObjectSig({ path, data, cacheKey });
     const cachedValue = Caching.get(objectSig);
 
     if (cachedValue) {

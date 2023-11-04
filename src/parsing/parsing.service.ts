@@ -338,7 +338,7 @@ export class ParsingService {
 
     for (const result of results) {
       if (result.status === 'rejected') {
-        this.logger.error(`Error in tasks of batch parsing: ${result.reason}`);
+        this.logger.warn(`Error in tasks of batch parsing: ${result.reason}`);
         continue;
       }
 
@@ -373,13 +373,13 @@ export class ParsingService {
             return limit(() =>
               this.parse(
                 ...(parameters as Parameters<typeof this.parse>),
-              ).catch((err) => this.logger.error(`${err}`)),
+              ).catch((err) => this.logger.warn(`${err}`)),
             );
           });
 
           Promise.allSettled(tasks);
         },
-        (i + 1) * 10_000,
+        (i + 1) * 60_000,
       );
       this.schedulerRegistry.addTimeout(`${now}_${i}`, timeout);
     }
